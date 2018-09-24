@@ -1,4 +1,5 @@
 import numpy as np
+from readline import clear_history, add_history
 
 
 class RandomPlayer():
@@ -8,7 +9,7 @@ class RandomPlayer():
     def play(self, board):
         a = np.random.randint(self.game.getActionSize())
         valids = self.game.getValidMoves(board, 1)
-        while valids[a]!=1:
+        while valids[a] != 1:
             a = np.random.randint(self.game.getActionSize())
         return a
 
@@ -20,14 +21,19 @@ class HumanOthelloPlayer():
     def play(self, board):
         # display(board)
         valid = self.game.getValidMoves(board, 1)
-        for i in range(len(valid)):
-            if valid[i]:
-                print(int(i/self.game.n), int(i%self.game.n))
+        moves = []
+        for i, index_valid in enumerate(valid):
+            if index_valid:
+                move = "{} {}".format(int(i / self.game.n), int(i % self.game.n))
+                moves.append(move)
+        print("; ".join(moves))
         while True:
+            clear_history()
+            [add_history(move) for move in moves]
             a = input()
 
-            x,y = [int(x) for x in a.split(' ')]
-            a = self.game.n * x + y if x!= -1 else self.game.n ** 2
+            x, y = [int(x) for x in a.split(' ')]
+            a = self.game.n * x + y if x != -1 else self.game.n ** 2
             if valid[a]:
                 break
             else:
@@ -44,7 +50,7 @@ class GreedyOthelloPlayer():
         valids = self.game.getValidMoves(board, 1)
         candidates = []
         for a in range(self.game.getActionSize()):
-            if valids[a]==0:
+            if valids[a] == 0:
                 continue
             nextBoard, _ = self.game.getNextState(board, 1, a)
             score = self.game.getScore(nextBoard, 1)

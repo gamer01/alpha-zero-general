@@ -33,5 +33,5 @@ if __name__ == "__main__":
     mcts2 = MCTS(g, n2, args2)
     n2p = lambda x: np.argmax(mcts2.getActionProb(x, temp=0))
 
-    arena = Arena.Arena(n1p, n2p, g, display=display)
+    arena = Arena.Arena(n1p, hp, g, display=display)
     print(arena.playGames(2, verbose=True))
