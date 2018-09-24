@@ -1,6 +1,6 @@
 from Coach import Coach
 from othello.OthelloGame import OthelloGame as Game
-from othello.pytorch.NNet import NNetWrapper as nn
+from othello.tensorflow.NNet import NNetWrapper as nn
 from utils import *
 
 args = dotdict({
@@ -15,9 +15,8 @@ args = dotdict({
 
     'checkpoint': './temp/',
     'load_model': False,
-    'load_folder_file': ('/dev/models/8x100x50','best.pth.tar'),
+    'load_folder_file': ('./temp','best.pth.tar'),
     'numItersForTrainExamplesHistory': 20,
-
 })
 
 if __name__=="__main__":
