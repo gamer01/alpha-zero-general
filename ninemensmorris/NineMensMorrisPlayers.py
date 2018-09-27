@@ -1,6 +1,8 @@
 import numpy as np
 from readline import clear_history, add_history
 
+from ninemensmorris.NineMensMorrisLogic import Board
+
 
 class RandomPlayer():
     def __init__(self, game):
@@ -8,23 +10,22 @@ class RandomPlayer():
 
     def play(self, board):
         a = np.random.randint(self.game.getActionSize())
-        valids = self.game.getValidMoves(board, 1)
+        valids = self.game.getValidMoves(board, -1)
         while valids[a] != 1:
             a = np.random.randint(self.game.getActionSize())
         return a
 
 
-class HumanNineMensMorrisPlayer():
+class HumanMorrisPlayer():
     def __init__(self, game):
         self.game = game
 
     def play(self, board):
-        # display(board)
-        valid = self.game.getValidMoves(board, 1)
+        valid = self.game.getValidMoves(board, 1).reshape((8, 3))
         moves = []
-        for i, index_valid in enumerate(valid):
+        for (ringpos, z), index_valid in np.ndenumerate(valid):
             if index_valid:
-                move = "{} {}".format(int(i / self.game.n), int(i % self.game.n))
+                move = "{} {} {}".format(*Board.actionToPos[ringpos], z)
                 moves.append(move)
         print("; ".join(moves))
         while True:
@@ -32,28 +33,10 @@ class HumanNineMensMorrisPlayer():
             [add_history(move) for move in moves]
             a = input()
 
-            x, y = [int(x) for x in a.split(' ')]
-            a = self.game.n * x + y if x != -1 else self.game.n ** 2
-            if valid[a]:
+            y, x, z = [int(x) for x in a.strip().split(' ')]
+            if valid[Board.actionToPos.inv[(y, x)], z]:
                 break
             else:
                 print('Invalid')
 
-        return a
-
-
-class GreedyNineMensMorrisPlayer():
-    def __init__(self, game):
-        self.game = game
-
-    def play(self, board):
-        valids = self.game.getValidMoves(board, 1)
-        candidates = []
-        for a in range(self.game.getActionSize()):
-            if valids[a] == 0:
-                continue
-            nextBoard, _ = self.game.getNextState(board, 1, a)
-            score = self.game.getScore(nextBoard, 1)
-            candidates += [(-score, a)]
-        candidates.sort()
-        return candidates[0][1]
+        return np.ravel_multi_index((Board.actionToPos.inv[(y, x)], z), (8, 3), order="F")

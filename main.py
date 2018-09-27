@@ -13,14 +13,14 @@ args = dotdict({
     'arenaCompare': 40,
     'cpuct': 1,
 
-    'checkpoint': './training/ninemens/',
+    'checkpoint': './training/morris/',
     'load_model': False,
     'load_folder_file': ('./training/ninemens','best.pth.tar'),
     'numItersForTrainExamplesHistory': 20,
 })
 
 if __name__=="__main__":
-    g = Game(6)
+    g = Game()
     nnet = nn(g)
 
     if args.load_model:

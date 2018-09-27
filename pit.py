@@ -1,8 +1,8 @@
 import Arena
 from MCTS import MCTS
-from othello.OthelloGame import OthelloGame, display
-from othello.OthelloPlayers import *
-from othello.tensorflow.NNet import NNetWrapper as NNet
+from ninemensmorris.NineMensMorrisGame import NineMensMorrisGame as Game
+from ninemensmorris.NineMensMorrisPlayers import *
+from ninemensmorris.tensorflow.NNet import NNetWrapper as NNet
 
 import numpy as np
 from utils import *
@@ -12,13 +12,12 @@ use this script to play any two agents against each other, or play manually with
 any agent.
 """
 if __name__ == "__main__":
-    g = OthelloGame(6)
+    g = Game()
 
     # all players
     rp = RandomPlayer(g).play
-    gp = GreedyOthelloPlayer(g).play
-    hp = HumanOthelloPlayer(g).play
-
+    hp = HumanMorrisPlayer(g).play
+    """
     # nnet players
     n1 = NNet(g)
     n1.load_checkpoint('./temp/','best.pth.tar')
@@ -26,7 +25,7 @@ if __name__ == "__main__":
     mcts1 = MCTS(g, n1, args1)
     n1p = lambda x: np.argmax(mcts1.getActionProb(x, temp=0))
 
-    """
+    
     n2 = NNet(g)
     n2.load_checkpoint('./temp/','checkpoint_5.pth.tar')
     args2 = dotdict({'numMCTSSims': 25, 'cpuct':1.0})
@@ -34,5 +33,5 @@ if __name__ == "__main__":
     n2p = lambda x: np.argmax(mcts2.getActionProb(x, temp=0))
     """
 
-    arena = Arena.Arena(n1p, rp, g, display=display)
+    arena = Arena.Arena(hp, rp, g, display=lambda board: print((Board(board))))
     print(arena.playGames(6, verbose=True))

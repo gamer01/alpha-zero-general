@@ -8,121 +8,62 @@ import numpy as np
 
 
 class NineMensMorrisGame(Game):
-    def __init__(self, n):
-        self.n = n
-
     def getInitBoard(self):
         # return initial board (numpy board)
-        b = Board(self.n)
-        return np.array(b.pieces)
+        return Board().toTensor()
 
     def getBoardSize(self):
-        # (a,b) tuple
-        return (self.n, self.n)
+        # (y,x,z) z being the rings from inside out plus the additional planes for the specific states
+        return Board().toTensor().shape
 
     def getActionSize(self):
-        # return number of actions
-        return self.n * self.n + 1
+        return Board.actionSpaceCardinality
 
     def getNextState(self, board, player, action):
         # if player takes action on board, return next (board,player)
         # action must be a valid move
-        if action == self.n * self.n:
-            return (board, -player)
-        b = Board(self.n)
-        b.pieces = np.copy(board)
-        move = (int(action / self.n), action % self.n)
-        b.execute_move(move, player)
-        return (b.pieces, -player)
+        b = Board(board)
+        nextPlayer = b.executeAction(action,player)
+        # return after state and next player
+        return (b.toTensor(), nextPlayer)
 
     def getValidMoves(self, board, player):
         # return a fixed size binary vector
-        valids = [0] * self.getActionSize()
-        b = Board(self.n)
-        b.pieces = np.copy(board)
-        legalMoves = b.get_legal_moves(player)
-        if len(legalMoves) == 0:
-            valids[-1] = 1
-            return np.array(valids)
-        for x, y in legalMoves:
-            valids[self.n * x + y] = 1
-        return np.array(valids)
+        return Board(board).getLegalMoves(player)
 
     def getGameEnded(self, board, player):
         # return 0 if not ended, 1 if player 1 won, -1 if player 1 lost
         # player = 1
-        b = Board(self.n)
-        b.pieces = np.copy(board)
-        if b.has_legal_moves(player):
-            return 0
-        if b.has_legal_moves(-player):
-            return 0
-        if b.countDiff(player) > 0:
-            return 1
-        return -1
+        return Board(board).hasWon(player)
 
     def getCanonicalForm(self, board, player):
         # return state if player==1, else return -state if player==-1
-        return player * board
+        board[:, :, :3] *= player
+        return board
 
     def getSymmetries(self, board, pi):
-        # mirror, rotational
-        assert (len(pi) == self.n ** 2 + 1)  # 1 for pass
-        pi_board = np.reshape(pi[:-1], (self.n, self.n))
+        """
+        mirror on south east diagonal and rotate by multiples of 90 degrees
+        :param board:
+        :param pi:
+        :return:
+        """
+        pi_board = np.reshape(pi[:-1], (8, 3))
         l = []
-
-        for i in range(1, 5):
-            for j in [True, False]:
-                newB = np.rot90(board, i)
-                newPi = np.rot90(pi_board, i)
+        for i in range(4):
+            newB = np.rot90(board, i)
+            newPi = np.roll(pi_board, -2 * i, axis=0)
+            for j in [False, True]:
                 if j:
-                    newB = np.fliplr(newB)
-                    newPi = np.fliplr(newPi)
+                    # flip along top left rigth bottom diagonal
+                    newB = np.rot90(np.flip(newB, 0), -1)
+                    newPi = np.concatenate((newPi[:1, :], newPi[:0:-1, :]), axis=0)
                 l += [(newB, list(newPi.ravel()) + [pi[-1]])]
         return l
 
     def stringRepresentation(self, board):
-        # 8x8 numpy array (canonical board)
-        return board.tostring()
-
-    def getScore(self, board, player):
-        b = Board(self.n)
-        b.pieces = np.copy(board)
-        return b.countDiff(player)
+        # used for hashing in the MCTS
+        return repr(Board(board))
 
 
-def display(board):
-    n = board.shape[0]
 
-    print("   " + "|".join(map(str, range(n))))
-    for y in range(n):
-        print(y, "|", end="")  # print the row #
-        for x in range(n):
-            piece = board[y][x]  # get the piece to print
-            if piece == -1:
-                print("● ", end="")
-            elif piece == 1:
-                print("○ ", end="")
-            else:
-                if x == n:
-                    print("-", end="")
-                else:
-                    print("- ", end="")
-        print("|")
-    print((4 + 2 * n) * "—")
-
-"""
-·╶─────────╴·╶─────────╴·		   
-│ 				        │ 
-│   ·╶─────╴·╶─────╴·   │			   
-│   │  		        │   │		   
-│   │   ·╶─╴·╶─╴●   │   │
-│   │   │       │   │   │ 
-·╶─╴·╶─╴○       ·╶─╴·╶─╴·
-│   │   │       │   │   │ 		   
-│   │   ·╶─╴·╶─╴·   │   │
-│   │  		        │   │		   
-│   ·╶─────╴·╶─────╴·   │			   
-│ 				        │ 
-·╶─────────╴·╶─────────╴·
-"""

@@ -8,7 +8,7 @@ import tensorflow as tf
 class NineMensMorrisNNet():
     def __init__(self, game, args):
         # game params
-        self.board_x, self.board_y = game.getBoardSize()
+        self.board_y, self.board_x, self.board_z = game.getBoardSize()
         self.action_size = game.getActionSize()
         self.args = args
 
@@ -22,22 +22,23 @@ class NineMensMorrisNNet():
         # Neural Net
         self.graph = tf.Graph()
         with self.graph.as_default():
-            self.input_boards = tf.placeholder(tf.float32, shape=[None, self.board_x,
-                                                                  self.board_y])  # s: batch_size x board_x x board_y
+            self.input_boards = tf.placeholder(tf.float32, shape=[None, self.board_y,
+                                                                  self.board_x,
+                                                                  self.board_z])  # s: batch_size x board_x x board_y
             self.dropout = tf.placeholder(tf.float32)
             self.isTraining = tf.placeholder(tf.bool, name="is_training")
 
             x_image = tf.reshape(self.input_boards,
-                                 [-1, self.board_x, self.board_y, 1])  # batch_size  x board_x x board_y x 1
-            h_conv1 = Relu(BatchNormalization(self.conv2d(x_image, args.num_channels, 'same'), axis=3,
+                                 [-1, self.board_y, self.board_x, self.board_z])  # batch_size  x board_x x board_y x 1
+            h_conv1 = Relu(BatchNormalization(self.conv2d(x_image, args.num_channels), axis=3,
                                               training=self.isTraining))  # batch_size  x board_x x board_y x num_channels
-            h_conv2 = Relu(BatchNormalization(self.conv2d(h_conv1, args.num_channels, 'same'), axis=3,
+            h_conv2 = Relu(BatchNormalization(self.conv2d(h_conv1, args.num_channels), axis=3,
                                               training=self.isTraining))  # batch_size  x board_x x board_y x num_channels
-            h_conv3 = Relu(BatchNormalization(self.conv2d(h_conv2, args.num_channels, 'valid'), axis=3,
+            h_conv3 = Relu(BatchNormalization(self.conv2d(h_conv2, args.num_channels), axis=3,
                                               training=self.isTraining))  # batch_size  x (board_x-2) x (board_y-2) x num_channels
-            h_conv4 = Relu(BatchNormalization(self.conv2d(h_conv3, args.num_channels, 'valid'), axis=3,
+            h_conv4 = Relu(BatchNormalization(self.conv2d(h_conv3, args.num_channels), axis=3,
                                               training=self.isTraining))  # batch_size  x (board_x-4) x (board_y-4) x num_channels
-            h_conv4_flat = tf.reshape(h_conv4, [-1, args.num_channels * (self.board_x - 4) * (self.board_y - 4)])
+            h_conv4_flat = tf.reshape(h_conv4, [-1, args.num_channels * self.board_x * self.board_y])
             s_fc1 = Dropout(
                 Relu(BatchNormalization(Dense(h_conv4_flat, 1024, use_bias=False), axis=1, training=self.isTraining)),
                 rate=self.dropout)  # batch_size x 1024
@@ -50,7 +51,7 @@ class NineMensMorrisNNet():
 
             self.calculate_loss()
 
-    def conv2d(self, x, out_channels, padding):
+    def conv2d(self, x, out_channels, padding="same"):
         return tf.layers.conv2d(x, out_channels, kernel_size=[3, 3], padding=padding, use_bias=False)
 
     def calculate_loss(self):
