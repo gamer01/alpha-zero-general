@@ -13,6 +13,12 @@ class BoardTestCase(unittest.TestCase):
         b2 = Board(b.toTensor())
         self.assertEqual(repr(b), repr(b2))
 
+    def test_str(self):
+        b = Board()
+        b.board[0, 1, 2] = 1
+        b.board[1, 0, 1] = -1
+        print(b)
+
 
 class GameTestCase(unittest.TestCase):
     def test_canonicalform(self):
@@ -24,8 +30,8 @@ class GameTestCase(unittest.TestCase):
         b = Board()
         b.board[0, 0, 2] = -1
         b.board[0, 1, 2] = 1
-        for (board,pi) in Game().getSymmetries(b.toTensor(),np.arange(25)):
-            print(Board(board),pi)
+        for (board, pi) in Game().getSymmetries(b.toTensor(), np.arange(25)):
+            print(Board(board), pi)
 
 
 if __name__ == '__main__':

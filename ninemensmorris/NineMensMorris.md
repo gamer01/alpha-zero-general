@@ -18,7 +18,7 @@ first three planes express the board with
 - const plane "turns without mill" (50-turns until draw)
 - const plane "player with turn"
 
-
+The board gets inverted after every turn switch, so that the model can train on a agnostic view
 
 ## Action space
 The actions need to be independend of the phase, therefore they will be encoded with the triple

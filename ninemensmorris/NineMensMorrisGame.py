@@ -44,7 +44,10 @@ class NineMensMorrisGame(Game):
     def getCanonicalForm(self, board, player):
         # return state if player==1, else return -state if player==-1
         board[:, :, :3] *= player
-        return board
+        b = Board(board)
+        b.board *=player
+        b.whitePrisonerCount, b.blackPrisonerCount = b.blackPrisonerCount, b.whitePrisonerCount
+        return b.toTensor()
 
     def getSymmetries(self, board, pi):
         """

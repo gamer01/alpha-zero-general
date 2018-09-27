@@ -34,9 +34,9 @@ class HumanMorrisPlayer():
             a = input()
 
             y, x, z = [int(x) for x in a.strip().split(' ')]
-            if valid[Board.actionToPos.inv[(y, x)], z]:
+            if (x != 1 or y != 1) and valid[Board.actionToPos.inv[(y, x)], z]:
                 break
             else:
                 print('Invalid')
 
-        return np.ravel_multi_index((Board.actionToPos.inv[(y, x)], z), (8, 3), order="F")
+        return np.ravel_multi_index((Board.actionToPos.inv[(y, x)], z), (8, 3))

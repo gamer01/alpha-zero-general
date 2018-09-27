@@ -38,9 +38,9 @@ class Board:
         self.isSelecting = False if boardtensor is None else bool(boardtensor[0, 0, 3])
         self.isPlacing = True if boardtensor is None else bool(boardtensor[0, 0, 4])
         self.isImprisoning = False if boardtensor is None else bool(boardtensor[0, 0, 5])
-        self.prisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 6])
-        self.opponentPrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 7])
-        self.identicalStatesCount = 0 if boardtensor is None else int(boardtensor[0, 0, 8])
+        self.whitePrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 6])
+        self.blackPrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 7])
+        self.identicalStatesCount = 1 if boardtensor is None else int(boardtensor[0, 0, 8])
         self.turnsWithoutMills = 0 if boardtensor is None else int(boardtensor[0, 0, 9])
         self.playerWithTurn = 1 if boardtensor is None else int(boardtensor[0, 0, 10])  # white player starts
 
@@ -51,7 +51,7 @@ class Board:
     def toTensor(self) -> np.ndarray:
         return np.array(np.concatenate((self.board, *map(self._create_const_plane,
                                                          [self.isSelecting, self.isPlacing, self.isImprisoning,
-                                                          self.prisonerCount, self.opponentPrisonerCount,
+                                                          self.whitePrisonerCount, self.blackPrisonerCount,
                                                           self.identicalStatesCount, self.turnsWithoutMills,
                                                           self.playerWithTurn])), axis=2),
                         dtype=np.int8)
@@ -70,11 +70,11 @@ class Board:
             "State": "selecting" if self.isSelecting else
             "placing" if self.isPlacing else
             "imprisoning" if self.isImprisoning else "error",
-            "prisoner count": self.prisonerCount,
-            "opponent prisoner count": self.opponentPrisonerCount,
+            "white prisoner count": self.whitePrisonerCount,
+            "black prisoner count": self.blackPrisonerCount,
             "identical positions count": self.identicalStatesCount,
             "turns without mills": self.turnsWithoutMills,
-            "player in turn": self.playerWithTurn}.items()]
+            "player in turn": "white" if self.playerWithTurn == 1 else "black"}.items()]
         return "\n".join(b + "  " + i for b, i in
                          zip_longest(["".join(line) for line in board_to_print], infos, fillvalue=""))
 
@@ -89,11 +89,11 @@ class Board:
         if self.identicalStatesCount == 3 or self.turnsWithoutMills == 50:
             return .1  # draw
         if self.isImprisoning:
-            # if opponent has only 3 stones left and and its my turn to imprison 
-            if player == self.playerWithTurn and np.where(self.board >= -1 * player)[0].shape[0] <= 3:
+            # if i have imprisoned 6 stones and its my turn to imprison
+            if self._ownPrisonerCount() == 6 and player == self.playerWithTurn:
                 return 1
             # if opponents turn and i have only 3 stones left 
-            elif player != self.playerWithTurn and np.where(self.board >= player)[0].shape[0] <= 3:
+            elif self._opponentPrisonerCount() == 6 and player != self.playerWithTurn:
                 return -1
         if not np.count_nonzero(self.getLegalMoves(player) > 0):
             return -1
@@ -104,7 +104,7 @@ class Board:
         if ringpos % 2 == 0:
             # corner, cant move ring up or down
             for offset in [1, -1]:
-                y, x = Board.actionToPos[ringpos + offset]
+                y, x = Board.actionToPos[(ringpos + offset) % 8]
                 if self.board[y, x, ringindex] == 0:
                     freeNeigbourFields.append((y, x, ringindex))
         for offset in [1, -1]:
@@ -129,10 +129,16 @@ class Board:
                or y != 1 and np.abs(np.sum(self.board[y, :, ringindex])) >= 3 \
                or x != 1 and np.abs(np.sum(self.board[:, x, ringindex])) >= 3
 
+    def _ownPrisonerCount(self):
+        return self.whitePrisonerCount if self.playerWithTurn == 1 else self.blackPrisonerCount
+
+    def _opponentPrisonerCount(self):
+        return self.blackPrisonerCount if self.playerWithTurn == 1 else self.whitePrisonerCount
+
     def getLegalMoves(self, player):
         legalMoves = np.zeros((8, 3))
         ownStonesMask = np.abs(self.board + player) >= 2
-        opponentStonesMask = (self.board - player) == 0
+        opponentStonesMask = (self.board + player) == 0
         activeStoneMask = np.abs(self.board) == 2
         if self.isSelecting:
             # subturn 1 in phase 2&3: pick any own stone that can be moved
@@ -140,11 +146,11 @@ class Board:
                 ringpos = Board.actionToPos.inv[(y, x)]
                 # if he can fly, all stones can be moved, otherwise if only stones with a free adjacent field are valid
                 # since we are in phase 2 or 3, we dont have to count our stones on the board
-                if self.prisonerCount == 6 or self._getFreeNeighbourFields(ringpos, z):
+                if self._ownPrisonerCount() == 6 or self._getFreeNeighbourFields(ringpos, z):
                     legalMoves[ringpos, z] = 1
         elif self.isPlacing:
             # can fly to
-            if np.count_nonzero(ownStonesMask) < 9 or self.prisonerCount == 6:
+            if np.count_nonzero(ownStonesMask) < 9 or self._ownPrisonerCount() == 6:
                 # every free board position
                 for (y, x, z) in zip(*np.where(self.board == 0)):
                     # leave out the position of the board, as it has no real interpretation
@@ -161,7 +167,7 @@ class Board:
         elif self.isImprisoning:
             opponents_stones = list(zip(*np.where(opponentStonesMask)))
             # we should not get into the imprison state if the opponend has only 3 stones, because than the player has already won!!!
-            assert len(opponents_stones) > 3
+            assert self._ownPrisonerCount() <= 6
             for (y, x, z) in opponents_stones:
                 ringpos = Board.actionToPos.inv[(y, x)]
                 if not self._isInMill(ringpos, z):
@@ -187,7 +193,7 @@ class Board:
         """
         ringpos, z = np.unravel_index(action, (8, 3))
         y, x = Board.actionToPos[ringpos]
-        opponentStonesMask = self.board - player == 0
+        opponentStonesMask = (self.board + player) == 0
         activeStoneMask = np.abs(self.board) == 2
         end_of_turn = False
         if self.isSelecting:
@@ -211,7 +217,10 @@ class Board:
                 end_of_turn = True
         elif self.isImprisoning:
             self.isImprisoning = False
-            self.prisonerCount += 1
+            if player == 1:
+                self.whitePrisonerCount += 1
+            else:
+                self.blackPrisonerCount += 1
             end_of_turn = True
             # remove imprisoned stone
             self.board[y, x, z] = 0
@@ -222,14 +231,11 @@ class Board:
         # if end of turn (including all subturns)
         if end_of_turn:
             # inverted, because we are about to flip turns
-            if np.count_nonzero(opponentStonesMask) < 9 and self.prisonerCount == 0:
+            if (np.count_nonzero(opponentStonesMask) + self._ownPrisonerCount()) < 9:
                 # opponent is in phase 1 -> placing
                 self.isPlacing = True
             else:
-                # opponend in phase 2 or 3
+                # opponent in phase 2 or 3
                 self.isSelecting = True
-
-            self.board *= -1
-            self.prisonerCount, self.opponentPrisonerCount = self.opponentPrisonerCount, self.prisonerCount
             self.playerWithTurn *= -1
         return self.playerWithTurn
