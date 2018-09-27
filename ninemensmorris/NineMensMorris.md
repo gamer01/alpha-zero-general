@@ -6,13 +6,19 @@ Those values can be encoded into the center values of the board (the phases coul
 - one hot encoding for each players phase
 
 ### 3
-3x3x8
+3x3x11
 first three planes express the board with
 
-- constant plane expressing "Select Stone for Moving" (only called for phase 2 and 3)
-- constant plane for "fly stone to" (only for phase 1 and 3)
-- constant plane for "move stone to" (only phase 2)
-- constant plane select stone for imprisonment (after move, if )
+- const plane "select from"-state
+- const plane "select to"-state
+- const plane "imprisonopponent"-state
+- const plane "prisoner count"
+- const plane "opponent prisoner count"
+- const plane "identical states"
+- const plane "turns without mill" (50-turns until draw)
+- const plane "player with turn"
+
+
 
 ## Action space
 The actions need to be independend of the phase, therefore they will be encoded with the triple

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union, Tuple, List, Iterable
 
 from bidict import bidict
+from itertools import zip_longest
 
 folder = Path(__file__).parent
 
@@ -29,30 +30,31 @@ class Board:
     20─────────17╶─────────14
     """
     actionSpaceCardinality = 8 * 3
-
     actionToPos = bidict({k: v for k, v in enumerate(((0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0)))})
 
     def __init__(self, boardtensor=None):
         # (y,x,z)
         self.board = np.zeros((3, 3, 3)) if boardtensor is None else boardtensor[:, :, 0:3]
-        self.isSelectingStone = False if boardtensor is None else bool(boardtensor[0, 0, 3])
-        self.isSelectingToPosition = True if boardtensor is None else bool(boardtensor[0, 0, 4])
+        self.isSelecting = False if boardtensor is None else bool(boardtensor[0, 0, 3])
+        self.isPlacing = True if boardtensor is None else bool(boardtensor[0, 0, 4])
         self.isImprisoning = False if boardtensor is None else bool(boardtensor[0, 0, 5])
-        self.canFly = True if boardtensor is None else bool(boardtensor[0, 0, 6])
-        self.canOpponentFly = True if boardtensor is None else bool(boardtensor[0, 0, 7])
-        self.identicalStatesCount = 0 if boardtensor is None else boardtensor[0, 0, 8]
-        self.turnsWithoutMills = 0 if boardtensor is None else boardtensor[0, 0, 9]
-        self.playerWithTurn = 1 if boardtensor is None else boardtensor[0, 0, 10]  # white player starts
+        self.prisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 6])
+        self.opponentPrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 7])
+        self.identicalStatesCount = 0 if boardtensor is None else int(boardtensor[0, 0, 8])
+        self.turnsWithoutMills = 0 if boardtensor is None else int(boardtensor[0, 0, 9])
+        self.playerWithTurn = 1 if boardtensor is None else int(boardtensor[0, 0, 10])  # white player starts
 
     @staticmethod
     def _create_const_plane(value):
-        return np.full((3, 3, 1), int(value))
+        return np.full((3, 3, 1), int(value), dtype=np.int8)
 
     def toTensor(self) -> np.ndarray:
-        return np.concatenate((self.board, *map(self._create_const_plane,
-                                                [self.isSelectingStone, self.isSelectingToPosition, self.isImprisoning,
-                                                 self.canFly, self.canOpponentFly, self.identicalStatesCount,
-                                                 self.turnsWithoutMills, self.playerWithTurn])), axis=2)
+        return np.array(np.concatenate((self.board, *map(self._create_const_plane,
+                                                         [self.isSelecting, self.isPlacing, self.isImprisoning,
+                                                          self.prisonerCount, self.opponentPrisonerCount,
+                                                          self.identicalStatesCount, self.turnsWithoutMills,
+                                                          self.playerWithTurn])), axis=2),
+                        dtype=np.int8)
 
     def __str__(self):
         with open(folder / "board.txt") as file:
@@ -64,7 +66,17 @@ class Board:
             offsety = 6 - stridey
             if val != 0:
                 board_to_print[offsety + y * stridey][offsetx + x * stridex] = "○" if val > 0 else "●"
-        return "\n".join(["".join(line) for line in board_to_print])
+        infos = ["{:<26s} {}".format(k + ":", v) for k, v in {
+            "State": "selecting" if self.isSelecting else
+            "placing" if self.isPlacing else
+            "imprisoning" if self.isImprisoning else "error",
+            "prisoner count": self.prisonerCount,
+            "opponent prisoner count": self.opponentPrisonerCount,
+            "identical positions count": self.identicalStatesCount,
+            "turns without mills": self.turnsWithoutMills,
+            "player in turn": self.playerWithTurn}.items()]
+        return "\n".join(b + "  " + i for b, i in
+                         zip_longest(["".join(line) for line in board_to_print], infos, fillvalue=""))
 
     def __repr__(self):
         return str(self.toTensor().tostring())
@@ -83,29 +95,9 @@ class Board:
             # if opponents turn and i have only 3 stones left 
             elif player != self.playerWithTurn and np.where(self.board >= player)[0].shape[0] <= 3:
                 return -1
-        # TODO if any of the players cannot move, the player imobilized player has lost (maybe use np.count_nonzero(getlegalmoves)>0)
+        if not np.count_nonzero(self.getLegalMoves(player) > 0):
+            return -1
         return 0
-
-    def executeAction(self, action, player):
-        """
-        if the action triggers a new subturn for the player we will return the input player, otherwise the opponent is returned
-        sideeffect: changes board stage after action
-        :param action:
-        :param player:
-        :return: nextPlayer
-        """
-        mayImprison = False
-        if self.isSelectingStone:
-            # highlight selected stone by doubleing its value
-            pass
-        if self.isSelectingToPosition:
-            # remove highlited stone
-            # place new stone at "to"-position
-            # if mill closed and opponent has more than 3 stones or he has stones that are not inside a mill, he may imprison
-            pass
-
-        # TODO at the end of the turn (all subturns for the player) count in default dict how often this constellation was already there
-        # if a mill was closed after flying or moving, the turn ends after imprisoning, otherwise it ends after
 
     def _getFreeNeighbourFields(self, ringpos: int, ringindex: int) -> Iterable:
         freeNeigbourFields = []
@@ -139,15 +131,20 @@ class Board:
 
     def getLegalMoves(self, player):
         legalMoves = np.zeros((8, 3))
-        if self.isSelectingStone:
+        ownStonesMask = np.abs(self.board + player) >= 2
+        opponentStonesMask = (self.board - player) == 0
+        activeStoneMask = np.abs(self.board) == 2
+        if self.isSelecting:
             # subturn 1 in phase 2&3: pick any own stone that can be moved
-            for (y, x, z) in zip(*np.where(np.abs(self.board + player) >= 2)):  # filter own stones
-                # if he can fly, all stones can be moved, otherwise if only stones with a free ajecent field are valid
+            for (y, x, z) in zip(*np.where(ownStonesMask)):  # filter own stones
                 ringpos = Board.actionToPos.inv[(y, x)]
-                if self.canFly or self._getFreeNeighbourFields(ringpos, z):
+                # if he can fly, all stones can be moved, otherwise if only stones with a free adjacent field are valid
+                # since we are in phase 2 or 3, we dont have to count our stones on the board
+                if self.prisonerCount == 6 or self._getFreeNeighbourFields(ringpos, z):
                     legalMoves[ringpos, z] = 1
-        elif self.isSelectingToPosition:
-            if self.canFly:
+        elif self.isPlacing:
+            # can fly to
+            if np.count_nonzero(ownStonesMask) < 9 or self.prisonerCount == 6:
                 # every free board position
                 for (y, x, z) in zip(*np.where(self.board == 0)):
                     # leave out the position of the board, as it has no real interpretation
@@ -157,19 +154,82 @@ class Board:
                 # moving to
                 # find selected stone, check if there are ajecent fields
                 # assumption: at any given time only one stone is active and it is the stone of the current player, because after each complete turn there are no selected stones left
-                y, x, z = self.board[np.abs(self.board) == 2]
+                y, x, z = self.board[activeStoneMask]
                 ringpos = Board.actionToPos.inv[(y, x)]
                 for action in self._getFreeNeighbourFields(ringpos, z):
                     legalMoves[action] = 1
         elif self.isImprisoning:
-            opponents_stones = list(zip(*np.where(self.board - player == 0)))
+            opponents_stones = list(zip(*np.where(opponentStonesMask)))
             # we should not get into the imprison state if the opponend has only 3 stones, because than the player has already won!!!
             assert len(opponents_stones) > 3
             for (y, x, z) in opponents_stones:
                 ringpos = Board.actionToPos.inv[(y, x)]
                 if not self._isInMill(ringpos, z):
                     legalMoves[ringpos, z] = 1
+            if np.count_nonzero(legalMoves) == 0:
+                # all of the opponents stones are in mills, so the player may take stones inside mills!
+                for (y, x, z) in opponents_stones:
+                    ringpos = Board.actionToPos.inv[(y, x)]
+                    legalMoves[ringpos, z] = 1
         else:
-            assert False
+            # here we should never be able to come, so we will make sure that an error is raised
+            raise ValueError("The game state is in an illegal state", self, sep="\n")
 
         return legalMoves.ravel()
+
+    def executeAction(self, action: np.ndarray, player):
+        """
+        if the action triggers a new subturn for the player we will return the input player, otherwise the opponent is returned
+        sideeffect: changes board stage after action
+        :param action:
+        :param player:
+        :return: nextPlayer
+        """
+        ringpos, z = np.unravel_index(action, (8, 3))
+        y, x = Board.actionToPos[ringpos]
+        opponentStonesMask = self.board - player == 0
+        activeStoneMask = np.abs(self.board) == 2
+        end_of_turn = False
+        if self.isSelecting:
+            self.isSelecting = False
+            self.isPlacing = True
+            # highlight selected stone by doubling its value
+            self.board[y, x, z] *= 2
+        elif self.isPlacing:
+            self.isPlacing = False
+            # remove highlighted stone
+            self.board[activeStoneMask] = 0
+            # place new stone of players color at "to"-position
+            self.board[y, x, z] = player
+            # check if "to" position is in a mill
+            #  (it has been closed, as otherwise moving a stone there would have been invalid)
+            if self._isInMill(ringpos, z):
+                self.turnsWithoutMills = 0
+                self.isImprisoning = True
+            else:
+                self.turnsWithoutMills += 1
+                end_of_turn = True
+        elif self.isImprisoning:
+            self.isImprisoning = False
+            self.prisonerCount += 1
+            end_of_turn = True
+            # remove imprisoned stone
+            self.board[y, x, z] = 0
+        else:
+            # here we should never be able to come, so we will make sure that an error is raised
+            raise ValueError("The game state is in an illegal state", self, sep="\n")
+
+        # if end of turn (including all subturns)
+        if end_of_turn:
+            # inverted, because we are about to flip turns
+            if np.count_nonzero(opponentStonesMask) < 9 and self.prisonerCount == 0:
+                # opponent is in phase 1 -> placing
+                self.isPlacing = True
+            else:
+                # opponend in phase 2 or 3
+                self.isSelecting = True
+
+            self.board *= -1
+            self.prisonerCount, self.opponentPrisonerCount = self.opponentPrisonerCount, self.prisonerCount
+            self.playerWithTurn *= -1
+        return self.playerWithTurn

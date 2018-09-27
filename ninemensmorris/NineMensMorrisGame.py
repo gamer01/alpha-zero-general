@@ -1,6 +1,6 @@
 from __future__ import print_function
 import sys
-
+from collections import defaultdict
 sys.path.append('..')
 from Game import Game
 from .NineMensMorrisLogic import Board
@@ -8,6 +8,9 @@ import numpy as np
 
 
 class NineMensMorrisGame(Game):
+    def __init__(self):
+        self.boardstateOccurances = defaultdict(int)
+
     def getInitBoard(self):
         # return initial board (numpy board)
         return Board().toTensor()
@@ -24,6 +27,8 @@ class NineMensMorrisGame(Game):
         # action must be a valid move
         b = Board(board)
         nextPlayer = b.executeAction(action,player)
+        self.boardstateOccurances[repr(b.board)] += 1
+        b.identicalStatesCount = self.boardstateOccurances[repr(b.board)]
         # return after state and next player
         return (b.toTensor(), nextPlayer)
 
