@@ -91,13 +91,15 @@ class Board:
             return .1  # draw
         if self.isImprisoning:
             # if i have imprisoned 6 stones and its my turn to imprison
-            if self.whitePrisonerCount == 6 if player == 1 else self.blackPrisonerCount == 6:
+            if self._ownPrisonerCount(player) == 6:
                 return 1
             # if opponents turn and i have only 3 stones left 
-            elif self.blackPrisonerCount == 6 if player == 1 else self.whitePrisonerCount == 6:
+            elif self._opponentPrisonerCount(player) == 6:
                 return -1
         if not np.count_nonzero(self.getLegalMoves(player) > 0):
             return -1
+        elif not np.count_nonzero(self.getLegalMoves(-player) > 0):
+            return 1
         return 0
 
     def _getFreeNeighbourFields(self, ringpos: int, ringindex: int) -> Iterable:
@@ -131,60 +133,81 @@ class Board:
                or y != 1 and np.abs(np.sum(self.board[y, :, ringindex])) >= 3 \
                or x != 1 and np.abs(np.sum(self.board[:, x, ringindex])) >= 3
 
-    def _ownPrisonerCount(self):
-        return self.whitePrisonerCount if self.playerWithTurn == 1 else self.blackPrisonerCount
+    def _ownPrisonerCount(self,player = None):
+        if player is None:
+            player = self.playerWithTurn
+        return self.whitePrisonerCount if player == 1 else self.blackPrisonerCount
 
-    def _opponentPrisonerCount(self):
-        return self.blackPrisonerCount if self.playerWithTurn == 1 else self.whitePrisonerCount
+    def _opponentPrisonerCount(self,player = None):
+        if player is None:
+            player = self.playerWithTurn
+        return self.blackPrisonerCount if player == 1 else self.whitePrisonerCount
 
     def getLegalMoves(self, player):
         legalMoves = np.zeros((8, 3))
-        ownStonesMask = np.abs(self.board + player) >= 2
-        opponentStonesMask = (self.board + player) == 0
-        activeStoneMask = np.abs(self.board) == 2
-        if self.isSelecting:
-            # subturn 1 in phase 2&3: pick any own stone that can be moved
-            for (y, x, z) in zip(*np.where(ownStonesMask)):  # filter own stones
-                ringpos = Board.actionToPos.inv[(y, x)]
-                # if he can fly, all stones can be moved, otherwise if only stones with a free adjacent field are valid
-                # since we are in phase 2 or 3, we dont have to count our stones on the board
-                if self._opponentPrisonerCount() == 6 or self._getFreeNeighbourFields(ringpos, z):
-                    legalMoves[ringpos, z] = 1
-        elif self.isPlacing:
-            # can fly to
-            if np.count_nonzero(ownStonesMask) + self._opponentPrisonerCount() < 9 \
-                    or self._opponentPrisonerCount() == 6:
-                # every free board position
+        if player != self.playerWithTurn:
+            # if player would be in phase 1: placing
+            if np.count_nonzero(self._ownStonesMask(player)) + self._opponentPrisonerCount(player) < 9:
                 for (y, x, z) in zip(*np.where(self.board == 0)):
                     # leave out the position of the board, as it has no real interpretation
                     if not y == x == 1:
                         legalMoves[Board.actionToPos.inv[(y, x)], z] = 1
             else:
-                # moving to
-                # find selected stone, check if there are ajecent fields
-                # assumption: at any given time only one stone is active and it is the stone of the current player, because after each complete turn there are no selected stones left
-                y, x, z = (int(i) for i in np.where(activeStoneMask))
-                ringpos = Board.actionToPos.inv[(y, x)]
-                for (y, x, z) in self._getFreeNeighbourFields(ringpos, z):
-                    legalMoves[Board.actionToPos.inv[(y, x)], z] = 1
-        elif self.isImprisoning:
-            opponents_stones = list(zip(*np.where(opponentStonesMask)))
-            # we should not get into the imprison state if the opponend has only 3 stones, because than the player has already won!!!
-            assert self._ownPrisonerCount() <= 6
-            for (y, x, z) in opponents_stones:
-                ringpos = Board.actionToPos.inv[(y, x)]
-                if not self._isInMill(ringpos, z):
-                    legalMoves[ringpos, z] = 1
-            if np.count_nonzero(legalMoves) == 0:
-                # all of the opponents stones are in mills, so the player may take stones inside mills!
+                # player is in phase 2 or 3: selecting
+                for (y, x, z) in zip(*np.where(self._ownStonesMask(player))):  # filter own stones
+                    ringpos = Board.actionToPos.inv[(y, x)]
+                    # if he can fly, all stones can be moved, otherwise if only stones with a free adjacent field are valid
+                    # since we are in phase 2 or 3, we dont have to count our stones on the board
+                    if self._opponentPrisonerCount(player) == 6 or self._getFreeNeighbourFields(ringpos, z):
+                        legalMoves[ringpos, z] = 1
+        else:
+            if self.isSelecting:
+                # subturn 1 in phase 2&3: pick any own stone that can be moved
+                for (y, x, z) in zip(*np.where(self._ownStonesMask(player))):  # filter own stones
+                    ringpos = Board.actionToPos.inv[(y, x)]
+                    # if he can fly, all stones can be moved, otherwise if only stones with a free adjacent field are valid
+                    # since we are in phase 2 or 3, we dont have to count our stones on the board
+                    if self._opponentPrisonerCount(player) == 6 or self._getFreeNeighbourFields(ringpos, z):
+                        legalMoves[ringpos, z] = 1
+            elif self.isPlacing:
+                # can fly to
+                if np.count_nonzero(self._ownStonesMask(player)) + self._opponentPrisonerCount(player) < 9 \
+                        or self._opponentPrisonerCount(player) == 6:
+                    # every free board position
+                    for (y, x, z) in zip(*np.where(self.board == 0)):
+                        # leave out the position of the board, as it has no real interpretation
+                        if not y == x == 1:
+                            legalMoves[Board.actionToPos.inv[(y, x)], z] = 1
+                else:
+                    # moving to
+                    # find selected stone, check if there are ajecent fields
+                    # assumption: at any given time only one stone is active and it is the stone of the current player, because after each complete turn there are no selected stones left
+                    y, x, z = (int(i) for i in np.where( np.abs(self.board) == 2))
+                    ringpos = Board.actionToPos.inv[(y, x)]
+                    for (y, x, z) in self._getFreeNeighbourFields(ringpos, z):
+                        legalMoves[Board.actionToPos.inv[(y, x)], z] = 1
+            elif self.isImprisoning:
+                opponents_stones = list(zip(*np.where( self._opponentStonesMask(player))))
+                # we should not get into the imprison state if the opponend has only 3 stones, because than the player has already won!!!
+                assert self._ownPrisonerCount() <= 6
                 for (y, x, z) in opponents_stones:
                     ringpos = Board.actionToPos.inv[(y, x)]
-                    legalMoves[ringpos, z] = 1
-        else:
-            # here we should never be able to come, so we will make sure that an error is raised
-            raise ValueError("The game state is in an illegal state", self, sep="\n")
+                    if not self._isInMill(ringpos, z):
+                        legalMoves[ringpos, z] = 1
+                if np.count_nonzero(legalMoves) == 0:
+                    # all of the opponents stones are in mills, so the player may take stones inside mills!
+                    for (y, x, z) in opponents_stones:
+                        ringpos = Board.actionToPos.inv[(y, x)]
+                        legalMoves[ringpos, z] = 1
+            else:
+                # here we should never be able to come, so we will make sure that an error is raised
+                raise ValueError("The game state is in an illegal state", self, sep="\n")
 
         return legalMoves.ravel()
+
+    def _ownStonesMask(self, player):
+        ownStonesMask = np.abs(self.board + player) >= 2
+        return ownStonesMask
 
     def executeAction(self, action: np.ndarray, player):
         """
@@ -196,8 +219,6 @@ class Board:
         """
         ringpos, z = np.unravel_index(action, (8, 3))
         y, x = Board.actionToPos[ringpos]
-        opponentStonesMask = (self.board + player) == 0
-        activeStoneMask = np.abs(self.board) == 2
         end_of_turn = False
         if self.isSelecting:
             self.isSelecting = False
@@ -207,7 +228,7 @@ class Board:
         elif self.isPlacing:
             self.isPlacing = False
             # remove highlighted stone
-            self.board[activeStoneMask] = 0
+            self.board[np.abs(self.board) == 2] = 0
             # place new stone of players color at "to"-position
             self.board[y, x, z] = player
             # check if "to" position is in a mill
@@ -234,7 +255,7 @@ class Board:
         # if end of turn (including all subturns)
         if end_of_turn:
             # inverted, because we are about to flip turns
-            if (np.count_nonzero(opponentStonesMask) + self._ownPrisonerCount()) < 9:
+            if (np.count_nonzero( self._opponentStonesMask(player)) + self._ownPrisonerCount(player)) < 9:
                 # opponent is in phase 1 -> placing
                 self.isPlacing = True
             else:
@@ -242,3 +263,7 @@ class Board:
                 self.isSelecting = True
             self.playerWithTurn *= -1
         return self.playerWithTurn
+
+    def _opponentStonesMask(self, player):
+        opponentStonesMask = (self.board + player) == 0
+        return opponentStonesMask

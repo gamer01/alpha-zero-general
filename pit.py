@@ -35,4 +35,4 @@ if __name__ == "__main__":
     """
 
     arena = Arena.Arena(rp, rp2, g, display=lambda board: print((Board(board))))
-    print(arena.playGames(1, verbose=True))
+    print(arena.playGames(100, verbose=False))
