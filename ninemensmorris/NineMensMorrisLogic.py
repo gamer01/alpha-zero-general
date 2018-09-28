@@ -148,7 +148,7 @@ class Board:
                 ringpos = Board.actionToPos.inv[(y, x)]
                 # if he can fly, all stones can be moved, otherwise if only stones with a free adjacent field are valid
                 # since we are in phase 2 or 3, we dont have to count our stones on the board
-                if self._ownPrisonerCount() == 6 or self._getFreeNeighbourFields(ringpos, z):
+                if self._opponentPrisonerCount() == 6 or self._getFreeNeighbourFields(ringpos, z):
                     legalMoves[ringpos, z] = 1
         elif self.isPlacing:
             # can fly to

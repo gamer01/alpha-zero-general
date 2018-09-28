@@ -2,7 +2,7 @@ import numpy as np
 from readline import clear_history, add_history
 
 from ninemensmorris.NineMensMorrisLogic import Board
-np.random.seed(4)
+np.random.seed(9)
 
 class RandomPlayer():
     def __init__(self, game):
