@@ -15,13 +15,14 @@ args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
     'epochs': 10,
-    'batch_size': 64,
+    'batch_size': 128,
     'num_channels': 512,
 })
 
 
 class NNetWrapper(NeuralNet):
     def __init__(self, game):
+        super().__init__(game)
         self.nnet = onnet(game, args)
         self.board_y, self.board_x, self.board_z = game.getBoardSize()
         self.action_size = game.getActionSize()
@@ -96,8 +97,6 @@ class NNetWrapper(NeuralNet):
         prob, v = self.sess.run([self.nnet.prob, self.nnet.v],
                                 feed_dict={self.nnet.input_boards: board, self.nnet.dropout: 0,
                                            self.nnet.isTraining: False})
-
-        # print('PREDICTION TIME TAKEN : {0:03f}'.format(time.time()-start))
         return prob[0], v[0]
 
     def save_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):

@@ -56,6 +56,7 @@ class Arena():
         if verbose:
             assert (self.display)
             print("Game over: Turn ", str(it), "Result ", str(self.game.getGameEnded(board, 1)))
+            self.game.getGameEnded(board, -1)
             self.display(board)
         return self.game.getGameEnded(board, 1)
 
@@ -72,47 +73,28 @@ class Arena():
         eps_time = AverageMeter()
         bar = Bar('Arena.playGames', max=num)
         end = time.time()
-        eps = 0
-        if num % 2 != 0:
-            print(
-                "Number of games will be rounded down to multiple of two such that each player plays both sides equally often")
-        maxeps = int(num // 2 * 2)
-
-        num = num // 2
         oneWon = 0
         twoWon = 0
         draws = 0
-        for _ in range(num):
+        for eps in range(num):
             gameResult = self.playGame(verbose=verbose)
-            if gameResult == 1:
-                oneWon += 1
-            elif gameResult == -1:
-                twoWon += 1
+            if eps % 2 == 0:
+                if gameResult == 1:
+                    oneWon += 1
+                elif gameResult == -1:
+                    twoWon += 1
+                else:
+                    draws += 1
             else:
-                draws += 1
-            # bookkeeping + plot progress
-            eps += 1
-            eps_time.update(time.time() - end)
-            end = time.time()
-            bar.suffix = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps + 1,
-                                                                                                       maxeps=maxeps,
-                                                                                                       et=eps_time.avg,
-                                                                                                       total=bar.elapsed_td,
-                                                                                                       eta=bar.eta_td)
-            bar.next()
+                if gameResult == -1:
+                    oneWon += 1
+                elif gameResult == 1:
+                    twoWon += 1
+                else:
+                    draws += 1
+            self.player1, self.player2 = self.player2, self.player1
 
-        self.player1, self.player2 = self.player2, self.player1
-
-        for _ in range(num):
-            gameResult = self.playGame(verbose=verbose)
-            if gameResult == -1:
-                oneWon += 1
-            elif gameResult == 1:
-                twoWon += 1
-            else:
-                draws += 1
             # bookkeeping + plot progress
-            eps += 1
             eps_time.update(time.time() - end)
             end = time.time()
             bar.suffix = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps + 1,
@@ -121,7 +103,7 @@ class Arena():
                                                                                                        total=bar.elapsed_td,
                                                                                                        eta=bar.eta_td)
             bar.next()
-
+        self.player1, self.player2 = 1,-1
         bar.finish()
 
         return oneWon, twoWon, draws

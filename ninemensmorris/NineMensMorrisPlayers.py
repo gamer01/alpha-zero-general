@@ -2,17 +2,16 @@ import numpy as np
 from readline import clear_history, add_history
 
 from ninemensmorris.NineMensMorrisLogic import Board
-
+np.random.seed(4)
 
 class RandomPlayer():
     def __init__(self, game):
         self.game = game
 
     def play(self, board):
-        a = np.random.randint(self.game.getActionSize())
-        valids = self.game.getValidMoves(board, -1)
-        while valids[a] != 1:
-            a = np.random.randint(self.game.getActionSize())
+        # always as player one, as the board is in canonical form
+        valids = self.game.getValidMoves(board, 1)
+        a = np.random.choice(np.where(valids == 1)[0])
         return a
 
 
@@ -21,6 +20,7 @@ class HumanMorrisPlayer():
         self.game = game
 
     def play(self, board):
+        # board is in canonical form, so we use player 1
         valid = self.game.getValidMoves(board, 1).reshape((8, 3))
         moves = []
         for (ringpos, z), index_valid in np.ndenumerate(valid):

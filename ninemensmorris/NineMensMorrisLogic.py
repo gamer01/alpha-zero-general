@@ -65,7 +65,8 @@ class Board:
             stridey = ((z + 1) + z) + 1
             offsety = 6 - stridey
             if val != 0:
-                board_to_print[offsety + y * stridey][offsetx + x * stridex] = "○" if val > 0 else "●"
+                board_to_print[offsety + y * stridey][offsetx + x * stridex] = (
+                    "◇" if val > 1 else "○") if val > 0 else ("◆" if val < -1 else "●")
         infos = ["{:<26s} {}".format(k + ":", v) for k, v in {
             "State": "selecting" if self.isSelecting else
             "placing" if self.isPlacing else
@@ -84,16 +85,16 @@ class Board:
     def hasWon(self, player):
         """
         :param player:
-        :return: 1 if has one, -1 if has lost, 0 if game not ended, small value if draw
+        :return: 1 if has won, -1 if has lost, 0 if game not ended, small value if draw
         """
         if self.identicalStatesCount == 3 or self.turnsWithoutMills == 50:
             return .1  # draw
         if self.isImprisoning:
             # if i have imprisoned 6 stones and its my turn to imprison
-            if self._ownPrisonerCount() == 6 and player == self.playerWithTurn:
+            if self.whitePrisonerCount == 6 if player == 1 else self.blackPrisonerCount == 6:
                 return 1
             # if opponents turn and i have only 3 stones left 
-            elif self._opponentPrisonerCount() == 6 and player != self.playerWithTurn:
+            elif self.blackPrisonerCount == 6 if player == 1 else self.whitePrisonerCount == 6:
                 return -1
         if not np.count_nonzero(self.getLegalMoves(player) > 0):
             return -1
@@ -101,16 +102,17 @@ class Board:
 
     def _getFreeNeighbourFields(self, ringpos: int, ringindex: int) -> Iterable:
         freeNeigbourFields = []
-        if ringpos % 2 == 0:
+        if ringpos % 2 != 0:
             # corner, cant move ring up or down
             for offset in [1, -1]:
-                y, x = Board.actionToPos[(ringpos + offset) % 8]
-                if self.board[y, x, ringindex] == 0:
-                    freeNeigbourFields.append((y, x, ringindex))
+                y, x = Board.actionToPos[ringpos]
+                # if the new ringindex is within board boundaries and field is empty
+                z = ringindex + offset
+                if 0 <= z < 3 and self.board[y, x, z] == 0:
+                    freeNeigbourFields.append((y, x, z))
         for offset in [1, -1]:
-            y, x = Board.actionToPos[ringpos]
-            # if the new ringindex is within board boundaries and field is empty
-            if 0 <= ringindex + offset < 3 and self.board[y, x, ringindex] == 0:
+            y, x = Board.actionToPos[(ringpos + offset) % 8]
+            if self.board[y, x, ringindex] == 0:
                 freeNeigbourFields.append((y, x, ringindex))
         return freeNeigbourFields
 
@@ -150,7 +152,8 @@ class Board:
                     legalMoves[ringpos, z] = 1
         elif self.isPlacing:
             # can fly to
-            if np.count_nonzero(ownStonesMask) < 9 or self._ownPrisonerCount() == 6:
+            if np.count_nonzero(ownStonesMask) + self._opponentPrisonerCount() < 9 \
+                    or self._opponentPrisonerCount() == 6:
                 # every free board position
                 for (y, x, z) in zip(*np.where(self.board == 0)):
                     # leave out the position of the board, as it has no real interpretation
@@ -160,10 +163,10 @@ class Board:
                 # moving to
                 # find selected stone, check if there are ajecent fields
                 # assumption: at any given time only one stone is active and it is the stone of the current player, because after each complete turn there are no selected stones left
-                y, x, z = self.board[activeStoneMask]
+                y, x, z = (int(i) for i in np.where(activeStoneMask))
                 ringpos = Board.actionToPos.inv[(y, x)]
-                for action in self._getFreeNeighbourFields(ringpos, z):
-                    legalMoves[action] = 1
+                for (y, x, z) in self._getFreeNeighbourFields(ringpos, z):
+                    legalMoves[Board.actionToPos.inv[(y, x)], z] = 1
         elif self.isImprisoning:
             opponents_stones = list(zip(*np.where(opponentStonesMask)))
             # we should not get into the imprison state if the opponend has only 3 stones, because than the player has already won!!!

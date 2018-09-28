@@ -1,6 +1,7 @@
 from __future__ import print_function
 import sys
 from collections import defaultdict
+
 sys.path.append('..')
 from Game import Game
 from .NineMensMorrisLogic import Board
@@ -9,6 +10,7 @@ import numpy as np
 
 class NineMensMorrisGame(Game):
     def __init__(self):
+        super().__init__()
         self.boardstateOccurances = defaultdict(int)
 
     def getInitBoard(self):
@@ -22,41 +24,42 @@ class NineMensMorrisGame(Game):
     def getActionSize(self):
         return Board.actionSpaceCardinality
 
-    def getNextState(self, board, player, action):
+    def getNextState(self, board: np.ndarray, player, action):
         # if player takes action on board, return next (board,player)
         # action must be a valid move
-        b = Board(board)
-        nextPlayer = b.executeAction(action,player)
+        b = Board(board.copy())
+        nextPlayer = b.executeAction(action, player)
         self.boardstateOccurances[repr(b.board)] += 1
         b.identicalStatesCount = self.boardstateOccurances[repr(b.board)]
         # return after state and next player
         return (b.toTensor(), nextPlayer)
 
-    def getValidMoves(self, board, player):
+    def getValidMoves(self, board: np.ndarray, player):
         # return a fixed size binary vector
-        return Board(board).getLegalMoves(player)
+        return Board(board.copy()).getLegalMoves(player)
 
-    def getGameEnded(self, board, player):
+    def getGameEnded(self, board: np.ndarray, player):
         # return 0 if not ended, 1 if player 1 won, -1 if player 1 lost
         # player = 1
-        return Board(board).hasWon(player)
+        return Board(board.copy()).hasWon(player)
 
-    def getCanonicalForm(self, board, player):
+    def getCanonicalForm(self, board: np.ndarray, player):
         # return state if player==1, else return -state if player==-1
-        board[:, :, :3] *= player
-        b = Board(board)
-        b.board *=player
-        b.whitePrisonerCount, b.blackPrisonerCount = b.blackPrisonerCount, b.whitePrisonerCount
+        b = Board(board.copy())
+        if player == -1:
+            b.board *= -1
+            b.playerWithTurn *= -1
+            b.whitePrisonerCount, b.blackPrisonerCount = b.blackPrisonerCount, b.whitePrisonerCount
         return b.toTensor()
 
-    def getSymmetries(self, board, pi):
+    def getSymmetries(self, board: np.ndarray, pi):
         """
         mirror on south east diagonal and rotate by multiples of 90 degrees
         :param board:
         :param pi:
         :return:
         """
-        pi_board = np.reshape(pi[:-1], (8, 3))
+        pi_board = np.reshape(pi, (8, 3))
         l = []
         for i in range(4):
             newB = np.rot90(board, i)
@@ -66,12 +69,9 @@ class NineMensMorrisGame(Game):
                     # flip along top left rigth bottom diagonal
                     newB = np.rot90(np.flip(newB, 0), -1)
                     newPi = np.concatenate((newPi[:1, :], newPi[:0:-1, :]), axis=0)
-                l += [(newB, list(newPi.ravel()) + [pi[-1]])]
+                l.append((newB, list(newPi.ravel())))
         return l
 
     def stringRepresentation(self, board):
         # used for hashing in the MCTS
         return repr(Board(board))
-
-
-
