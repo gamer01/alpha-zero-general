@@ -2,7 +2,6 @@ import numpy as np
 from readline import clear_history, add_history
 
 from ninemensmorris.NineMensMorrisLogic import Board
-#np.random.seed(12)#9
 
 class RandomPlayer():
     def __init__(self, game):
@@ -33,10 +32,13 @@ class HumanMorrisPlayer():
             [add_history(move) for move in moves]
             a = input()
 
-            y, x, z = [int(x) for x in a.strip().split(' ')]
-            if (x != 1 or y != 1) and valid[Board.actionToPos.inv[(y, x)], z]:
-                break
-            else:
+            try:
+                y, x, z = [int(x) for x in a.strip().split(' ')]
+                if (x != 1 or y != 1) and valid[Board.actionToPos.inv[(y, x)], z]:
+                    break
+                else:
+                    print('Invalid')
+            except ValueError:
                 print('Invalid')
 
         return np.ravel_multi_index((Board.actionToPos.inv[(y, x)], z), (8, 3))

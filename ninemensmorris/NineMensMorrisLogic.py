@@ -42,19 +42,19 @@ class Board:
         self.blackPrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 7])
         self.identicalStatesCount = 1 if boardtensor is None else int(boardtensor[0, 0, 8])
         self.turnsWithoutMills = 0 if boardtensor is None else int(boardtensor[0, 0, 9])
-        self.playerWithTurn = 1 if boardtensor is None else int(boardtensor[0, 0, 10])  # white player starts
+        self.turn = 0 if boardtensor is None else int(boardtensor[0, 0, 10])
+        self.playerWithTurn = 1 if boardtensor is None else int(boardtensor[0, 0, 11])  # white player starts
 
     @staticmethod
     def _create_const_plane(value):
-        return np.full((3, 3, 1), int(value), dtype=np.int8)
+        return np.full((3, 3, 1), int(value))
 
     def toTensor(self) -> np.ndarray:
-        return np.array(np.concatenate((self.board, *map(self._create_const_plane,
-                                                         [self.isSelecting, self.isPlacing, self.isImprisoning,
-                                                          self.whitePrisonerCount, self.blackPrisonerCount,
-                                                          self.identicalStatesCount, self.turnsWithoutMills,
-                                                          self.playerWithTurn])), axis=2),
-                        dtype=np.int8)
+        return np.concatenate((self.board, *map(self._create_const_plane,
+                                                [self.isSelecting, self.isPlacing, self.isImprisoning,
+                                                 self.whitePrisonerCount, self.blackPrisonerCount,
+                                                 self.identicalStatesCount, self.turnsWithoutMills, self.turn,
+                                                 self.playerWithTurn])), axis=2)
 
     def __str__(self):
         with open(folder / "board.txt") as file:
@@ -75,6 +75,7 @@ class Board:
             "black prisoner count": self.blackPrisonerCount,
             "identical positions count": self.identicalStatesCount,
             "turns without mills": self.turnsWithoutMills,
+            "turns": self.turn,
             "player in turn": "white" if self.playerWithTurn == 1 else "black"}.items()]
         return "\n".join(b + "  " + i for b, i in
                          zip_longest(["".join(line) for line in board_to_print], infos, fillvalue=""))
@@ -87,7 +88,7 @@ class Board:
         :param player:
         :return: 1 if has won, -1 if has lost, 0 if game not ended, small value if draw
         """
-        if self.identicalStatesCount == 3 or self.turnsWithoutMills == 50:
+        if self.identicalStatesCount >= 3 or self.turnsWithoutMills >= 50:
             return .1  # draw
         if self.isImprisoning:
             # if i have imprisoned 6 stones and its my turn to imprison
@@ -133,12 +134,12 @@ class Board:
                or y != 1 and np.abs(np.sum(self.board[y, :, ringindex])) >= 3 \
                or x != 1 and np.abs(np.sum(self.board[:, x, ringindex])) >= 3
 
-    def _ownPrisonerCount(self,player = None):
+    def _ownPrisonerCount(self, player=None):
         if player is None:
             player = self.playerWithTurn
         return self.whitePrisonerCount if player == 1 else self.blackPrisonerCount
 
-    def _opponentPrisonerCount(self,player = None):
+    def _opponentPrisonerCount(self, player=None):
         if player is None:
             player = self.playerWithTurn
         return self.blackPrisonerCount if player == 1 else self.whitePrisonerCount
@@ -182,12 +183,12 @@ class Board:
                     # moving to
                     # find selected stone, check if there are ajecent fields
                     # assumption: at any given time only one stone is active and it is the stone of the current player, because after each complete turn there are no selected stones left
-                    y, x, z = (int(i) for i in np.where( np.abs(self.board) == 2))
+                    y, x, z = (int(i) for i in np.where(np.abs(self.board) == 2))
                     ringpos = Board.actionToPos.inv[(y, x)]
                     for (y, x, z) in self._getFreeNeighbourFields(ringpos, z):
                         legalMoves[Board.actionToPos.inv[(y, x)], z] = 1
             elif self.isImprisoning:
-                opponents_stones = list(zip(*np.where( self._opponentStonesMask(player))))
+                opponents_stones = list(zip(*np.where(self._opponentStonesMask(player))))
                 # we should not get into the imprison state if the opponend has only 3 stones, because than the player has already won!!!
                 assert self._ownPrisonerCount() <= 6
                 for (y, x, z) in opponents_stones:
@@ -254,8 +255,9 @@ class Board:
 
         # if end of turn (including all subturns)
         if end_of_turn:
+            self.turn += 1
             # inverted, because we are about to flip turns
-            if (np.count_nonzero( self._opponentStonesMask(player)) + self._ownPrisonerCount(player)) < 9:
+            if (np.count_nonzero(self._opponentStonesMask(player)) + self._ownPrisonerCount(player)) < 9:
                 # opponent is in phase 1 -> placing
                 self.isPlacing = True
             else:
