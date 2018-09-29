@@ -97,9 +97,9 @@ class Board:
             # if opponents turn and i have only 3 stones left 
             elif self._opponentPrisonerCount(player) == 6:
                 return -1
-        if not np.count_nonzero(self.getLegalMoves(player) > 0):
+        if np.count_nonzero(self.getLegalMoves(player) > 0) == 0:
             return -1
-        elif not np.count_nonzero(self.getLegalMoves(-player) > 0):
+        elif np.count_nonzero(self.getLegalMoves(-player) > 0) == 0:
             return 1
         return 0
 

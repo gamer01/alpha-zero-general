@@ -29,7 +29,7 @@ class NNetWrapper(NeuralNet):
 
         config = tf.ConfigProto()
         #config.gpu_options.allow_growth = True
-        config.gpu_options.per_process_gpu_memory_fraction = 0.4
+        config.gpu_options.per_process_gpu_memory_fraction = 0.30
         self.sess = tf.Session(graph=self.nnet.graph,config=config)
         self.saver = None
         with tf.Session(config=config) as temp_sess:

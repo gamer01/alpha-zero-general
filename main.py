@@ -1,6 +1,8 @@
 from Coach import Coach
 from ninemensmorris.NineMensMorrisGame import NineMensMorrisGame as Game
 from ninemensmorris.tensorflow.NNet import NNetWrapper as nn
+#from othello.tensorflow.NNet import NNetWrapper as nn
+#from othello.OthelloGame import OthelloGame as Game
 from utils import *
 
 args = dotdict({
@@ -13,14 +15,14 @@ args = dotdict({
     'arenaCompare': 40,
     'cpuct': 1,
 
-    'checkpoint': '/mnt/data/morris/training/',
-    'load_model': True,
-    'load_folder_file': ('./training/morris','checkpoint_2.pth.tar'),
+    'checkpoint': '/mnt/data/morris/training/1/',
+    'load_model': False,
+    'load_folder_file': ('./training/morris', 'checkpoint_2.pth.tar'),
     'numItersForTrainExamplesHistory': 20,
 })
 
-if __name__=="__main__":
-    g = Game()
+if __name__ == "__main__":
+    g = Game(ignore_board_repetitions=True)
     nnet = nn(g)
 
     if args.load_model:

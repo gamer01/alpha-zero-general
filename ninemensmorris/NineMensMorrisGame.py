@@ -10,10 +10,10 @@ import numpy as np
 
 
 class NineMensMorrisGame(Game):
-    def __init__(self):
+    def __init__(self, ignore_board_repetitions= False):
         super().__init__()
         self.boardstateOccurances = defaultdict(set)
-        self.turn = 0
+        self.ignore_board_repetitions = ignore_board_repetitions
 
     def getInitBoard(self):
         # return initial board (numpy board)
@@ -33,7 +33,7 @@ class NineMensMorrisGame(Game):
         nextPlayer = b.executeAction(action, player)
         # this function gets queried very often, if the board has not changed since last query, it is not a new state!
         self.boardstateOccurances[repr(b.board)].add(b.turn)
-        b.identicalStatesCount = len(self.boardstateOccurances[repr(b.board)])
+        b.identicalStatesCount = 1 if self.ignore_board_repetitions else len(self.boardstateOccurances[repr(b.board)])
         # return after state and next player
         return (b.toTensor(), nextPlayer)
 

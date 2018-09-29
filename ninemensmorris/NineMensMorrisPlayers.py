@@ -13,7 +13,6 @@ class RandomPlayer():
         a = np.random.choice(np.where(valids == 1)[0])
         return a
 
-
 class HumanMorrisPlayer():
     def __init__(self, game):
         self.game = game
