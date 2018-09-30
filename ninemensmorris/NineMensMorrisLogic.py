@@ -31,30 +31,65 @@ class Board:
     """
     actionSpaceCardinality = 8 * 3
     actionToPos = bidict({k: v for k, v in enumerate(((0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1), (2, 0), (1, 0)))})
+    history_length = 12
 
     def __init__(self, boardtensor=None):
-        # (y,x,z)
-        self.board = np.zeros((3, 3, 3)) if boardtensor is None else boardtensor[:, :, 0:3]
-        self.isSelecting = False if boardtensor is None else bool(boardtensor[0, 0, 3])
-        self.isPlacing = True if boardtensor is None else bool(boardtensor[0, 0, 4])
-        self.isImprisoning = False if boardtensor is None else bool(boardtensor[0, 0, 5])
-        self.whitePrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 6])
-        self.blackPrisonerCount = 0 if boardtensor is None else int(boardtensor[0, 0, 7])
-        self.identicalStatesCount = 1 if boardtensor is None else int(boardtensor[0, 0, 8])
-        self.turnsWithoutMills = 0 if boardtensor is None else int(boardtensor[0, 0, 9])
-        self.turn = 0 if boardtensor is None else int(boardtensor[0, 0, 10])
-        self.playerWithTurn = 1 if boardtensor is None else int(boardtensor[0, 0, 11])  # white player starts
+        n_planes_history = 9 * (Board.history_length-1)
+        if boardtensor is None:
+            # history includes current state
+            self.history = np.zeros((3, 3, n_planes_history+9))
+
+            # last state
+            self.board = np.zeros((3, 3, 3))
+            self.isSelecting = False
+            self.isPlacing = True
+            self.isImprisoning = False
+            self.whitePrisonerCount = 0
+            self.blackPrisonerCount = 0
+            self.identicalStatesCount = 1
+
+            # global
+            self.turnsWithoutMills = 0
+            self.turn = 0
+            self.playerWithTurn = 1
+
+        else:
+            # history includes current state
+            self.history = boardtensor[:, :, :n_planes_history+9]
+
+            # last state
+            # (y,x,z)
+            self.board = boardtensor[:, :, n_planes_history:n_planes_history + 3]
+            self.isSelecting = bool(boardtensor[0, 0, n_planes_history + 3])
+            self.isPlacing = bool(boardtensor[0, 0, n_planes_history + 4])
+            self.isImprisoning = bool(boardtensor[0, 0, n_planes_history + 5])
+            self.whitePrisonerCount = int(boardtensor[0, 0, n_planes_history + 6])
+            self.blackPrisonerCount = int(boardtensor[0, 0, n_planes_history + 7])
+            self.identicalStatesCount = int(boardtensor[0, 0, n_planes_history + 8])
+
+            # global
+            self.turnsWithoutMills = int(boardtensor[0, 0, n_planes_history + 9])
+            self.turn = int(boardtensor[0, 0, n_planes_history + 10])
+            self.playerWithTurn = int(boardtensor[0, 0, n_planes_history + 11])  # white player starts
 
     @staticmethod
     def _create_const_plane(value):
         return np.full((3, 3, 1), int(value))
 
     def toTensor(self) -> np.ndarray:
-        return np.concatenate((self.board, *map(self._create_const_plane,
-                                                [self.isSelecting, self.isPlacing, self.isImprisoning,
-                                                 self.whitePrisonerCount, self.blackPrisonerCount,
-                                                 self.identicalStatesCount, self.turnsWithoutMills, self.turn,
-                                                 self.playerWithTurn])), axis=2)
+        if np.array_equal(self.board,self.history[:, :, 9 * (Board.history_length-1):9 * (Board.history_length-1)+3]):
+            # state has not changed
+            hist = self.history[:, :, :9 * (Board.history_length-1)]
+        else:
+            # drop last history item (first index)
+            hist = self.history[:, :, 9:]
+
+        return np.concatenate((hist, self.board, *map(self._create_const_plane,
+                                                              [self.isSelecting, self.isPlacing, self.isImprisoning,
+                                                               self.whitePrisonerCount, self.blackPrisonerCount,
+                                                               self.identicalStatesCount, self.turnsWithoutMills,
+                                                               self.turn,
+                                                               self.playerWithTurn])), axis=2)
 
     def __str__(self):
         with open(folder / "board.txt") as file:

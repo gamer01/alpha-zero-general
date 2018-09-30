@@ -15,7 +15,7 @@ args = dotdict({
     'arenaCompare': 40,
     'cpuct': 1,
 
-    'checkpoint': '/mnt/data/morris/training/1/',
+    'checkpoint': '/mnt/data/morris/training/2/',
     'load_model': False,
     'load_folder_file': ('./training/morris', 'checkpoint_2.pth.tar'),
     'numItersForTrainExamplesHistory': 20,
